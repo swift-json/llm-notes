@@ -3,6 +3,10 @@
     "pet-hospital": {
       "type": "streamable-http",
       "url": "http://127.0.0.1:9000/mcp"
+    },
+    "anythingllm": {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:9001/mcp"
     }
   }
 }

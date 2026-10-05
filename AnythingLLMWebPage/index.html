@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>AnythingLLM 文档上传</title>
+<style>
+  :root { font-family: system-ui, sans-serif; }
+  body { margin: 0; padding: 24px; background: #f5f5f5; color: #222; }
+  .card { max-width: 560px; background: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  h1 { font-size: 18px; margin: 0 0 16px; }
+  label { display: block; font-size: 13px; margin: 12px 0 4px; color: #555; }
+  select, input[type=file] { width: 100%; padding: 8px; box-sizing: border-box; font-size: 14px; }
+  button { margin-top: 16px; width: 100%; padding: 10px; font-size: 14px; border: 0; border-radius: 4px; background: #2563eb; color: #fff; cursor: pointer; }
+  button:disabled { background: #9bb4d6; cursor: not-allowed; }
+  #log { margin-top: 16px; white-space: pre-wrap; font-family: ui-monospace, Consolas, monospace; font-size: 12px; background: #0f172a; color: #d1d5db; padding: 12px; border-radius: 4px; max-height: 280px; overflow: auto; }
+  .ok { color: #4ade80; } .err { color: #f87171; } .dim { color: #94a3b8; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>AnythingLLM 文档上传与向量化</h1>
+    <label for="ws">目标工作区</label>
+    <select id="ws"><option value="">加载中...</option></select>
+    <label for="file">选择文档</label>
+    <input id="file" type="file" />
+    <button id="btn" disabled>上传并向量化</button>
+    <div id="log"></div>
+  </div>
+
+<script>
+const API_BASE = "http://localhost:3001"; // 服务器实际为 HTTP
+const API_KEY = "EQC554F-D1GM4WE-J78HA1G-BZ07N93";
+const HEADERS = { Authorization: "Bearer " + API_KEY };
+const $ = (id) => document.getElementById(id);
+const log = (msg, cls) => {
+  const el = $("log");
+  const span = document.createElement("span");
+  if (cls) span.className = cls;
+  span.textContent = msg + "\n";
+  el.appendChild(span);
+  el.scrollTop = el.scrollHeight;
+};
+
+async function loadWorkspaces() {
+  try {
+    const r = await fetch(`${API_BASE}/api/v1/workspaces`, { headers: HEADERS });
+    const data = await r.json();
+    const sel = $("ws");
+    sel.innerHTML = "";
+    (data.workspaces || []).forEach((w) => {
+      const o = document.createElement("option");
+      o.value = w.slug; o.textContent = w.name;
+      sel.appendChild(o);
+    });
+    // 默认选中 PetHospital
+    sel.value = "pethospital";
+    $("btn").disabled = false;
+    log("已加载 " + (data.workspaces?.length || 0) + " 个工作区", "dim");
+  } catch (e) {
+    log("加载工作区失败: " + e.message, "err");
+  }
+}
+
+async function upload() {
+  const file = $("file").files[0];
+  const slug = $("ws").value;
+  if (!file) { log("请先选择文档", "err"); return; }
+  if (!slug) { log("请选择工作区", "err"); return; }
+  $("btn").disabled = true;
+
+  // 步骤1：上传文档
+  log("[1/2] 上传文档 " + file.name + " ...", "dim");
+  let location;
+  try {
+    const fd = new FormData();
+    fd.append("file", file);
+    const r = await fetch(`${API_BASE}/api/v1/document/upload`, {
+      method: "POST", headers: HEADERS, body: fd
+    });
+    const data = await r.json();
+    if (!r.ok || !data.success) throw new Error(data.error || ("HTTP " + r.status));
+    location = data.documents?.[0]?.location;
+    if (!location) throw new Error("响应缺少 documents[0].location: " + JSON.stringify(data));
+    log("  上传成功 location=" + location, "ok");
+  } catch (e) {
+    log("  上传失败: " + e.message, "err"); $("btn").disabled = false; return;
+  }
+
+  // 步骤2：加入工作区并触发向量化嵌入
+  log("[2/2] 向工作区 " + slug + " 嵌入并向量化 ...", "dim");
+  try {
+    const r = await fetch(`${API_BASE}/api/v1/workspace/${slug}/update-embeddings`, {
+      method: "POST",
+      headers: { ...HEADERS, "Content-Type": "application/json" },
+      body: JSON.stringify({ adds: [location], deletes: [] })
+    });
+    const data = await r.json();
+    log("  响应: " + JSON.stringify(data), "dim");
+    if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+    log("  嵌入完成: " + (data.message || "成功"), "ok");
+    log("完成 ✓", "ok");
+  } catch (e) {
+    log("  嵌入失败: " + e.message, "err");
+  } finally {
+    $("btn").disabled = false;
+  }
+}
+
+$("btn").addEventListener("click", upload);
+loadWorkspaces();
+</script>
+</body>
+</html>
