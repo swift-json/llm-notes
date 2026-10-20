@@ -1,0 +1,96 @@
+%% files-oper-func.py 代码架构图
+%% 带 Function Call 的多轮 LLM 对话脚本（含文件操作）
+
+flowchart TD
+    %% ==================== 配置与初始化 ====================
+    subgraph INIT["⚙️ 配置与初始化"]
+        CFG["config.ini<br/>(configparser 读取)"]
+        CLIENT["OpenAI Client<br/>(base_url / api_key)"]
+        ROOT["ROOT 安全根目录<br/>LLM-Course"]
+        CFG --> CLIENT
+        CFG --> ROOT
+    end
+
+    %% ==================== 主循环 ====================
+    subgraph MAIN["🔁 多轮对话主循环"]
+        UIN["用户输入 input()"]
+        ADDUSER["messages.append(user)"]
+        CALL["client.chat.completions.create()<br/>(model, messages, tools)"]
+        DECIDE{"msg.tool_calls<br/>是否有工具调用?"}
+        PRINT["打印 AI 回复<br/>messages.append(assistant)"]
+        UIN --> ADDUSER --> CALL --> DECIDE
+        DECIDE -- 否 --> PRINT
+        PRINT --> UIN
+    end
+
+    %% ==================== 工具调用解析 ====================
+    subgraph DISPATCH["🧩 工具调用解析与派发"]
+        PARSE["json.loads(arguments)"]
+        LOOKUP["TOOL_HANDLERS.get(name)"]
+        SAFE["_safe() 路径校验<br/>(防越界, 抛 PermissionError)"]
+        TRY["try/except 错误处理<br/>PermissionError / FileNotFoundError / Exception"]
+        ADDTOOL["messages.append(tool 结果)"]
+        DECIDE -- 是 --> PARSE --> LOOKUP --> SAFE --> TRY --> ADDTOOL
+        ADDTOOL --> CALL
+    end
+
+    %% ==================== 注册的工具 (TOOLS + TOOL_HANDLERS) ====================
+    subgraph TOOLS["🛠️ 工具注册表 TOOLS (12个) & TOOL_HANDLERS 派发"]
+        subgraph T_ORIG["原有 2 个工具"]
+            T1["getDate → get_date()"]
+            T2["isLeapYear → is_leap_year()"]
+        end
+        subgraph T_FILE["文件操作 10 个工具 (均经 _safe 校验)"]
+            T3["getCwd → get_cwd()"]
+            T4["listDir → list_dir()"]
+            T5["getFileType → get_file_type()"]
+            T6["readFile → read_file()"]
+            T7["createFile → create_file()"]
+            T8["editFile → edit_file()"]
+            T9["createDir → create_dir()"]
+            T10["removeDir → remove_dir()"]
+            T11["removeFile → remove_file()"]
+            T12["renamePath → rename_path()"]
+        end
+    end
+
+    %% ==================== 底层实现依赖 ====================
+    subgraph IMPL["📦 底层依赖库"]
+        L1["subprocess<br/>(获取系统日期/时间)"]
+        L2["os / shutil<br/>(读写/增删/重命名)"]
+        L3["json<br/>(解析工具参数)"]
+        L4["datetime"]
+    end
+
+    %% ==================== 关系连线 ====================
+    CLIENT --> CALL
+    ROOT --> SAFE
+    LOOKUP --> TOOLS
+    T1 --> L1
+    T2 -.-> |纯计算| L4
+    T3 --> L2
+    T4 --> L2
+    T5 --> L2
+    T6 --> L2
+    T7 --> L2
+    T8 --> L2
+    T9 --> L2
+    T10 --> L2
+    T11 --> L2
+    T12 --> L2
+    PARSE --> L3
+    TEXT_EXT["TEXT_EXT 纯文本扩展名白名单<br/>readFile / editFile 使用"] -.-> T6
+    TEXT_EXT -.-> T8
+
+    %% 样式
+    classDef init fill:#e3f2fd,stroke:#1565c0,color:#0d47a1;
+    classDef main fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20;
+    classDef disp fill:#fff3e0,stroke:#ef6c00,color:#e65100;
+    classDef tool fill:#f3e5f5,stroke:#7b1fa2,color:#4a148c;
+    classDef impl fill:#eceff1,stroke:#455a64,color:#263238;
+
+    class CFG,CLIENT,ROOT init;
+    class UIN,ADDUSER,CALL,DECIDE,PRINT main;
+    class PARSE,LOOKUP,SAFE,TRY,ADDTOOL disp;
+    class T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,TEXT_EXT tool;
+    class L1,L2,L3,L4 impl;
