@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 import configparser
+from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -12,10 +13,17 @@ class LLMConfig:
 
 
 @dataclass(frozen=True)
+class SearchConfig:
+    api_key: str
+    base_url: str = "https://qianfan.baidubce.com/v2/ai_search"
+
+
+@dataclass(frozen=True)
 class Settings:
     llm: LLMConfig
     workspace_root: str
     system_prompt: str = ""
+    search: Optional[SearchConfig] = None
 
 
 def load_settings(config_path: Path) -> Settings:
@@ -28,10 +36,18 @@ def load_settings(config_path: Path) -> Settings:
         api_key=cfg["llm"]["api_key"],
         model=cfg["llm"]["model"],
     )
-    # 未显式配置时，工作区取配置文件上两级目录（aAgent -> Agent -> LLM-Course）
     workspace_root = cfg.get("agent", "workspace_root", fallback=str(config_path.parents[2]))
+    search = None
+    if cfg.has_section("search") and cfg.has_option("search", "baidu_qianfan_api_key"):
+        key = cfg["search"]["baidu_qianfan_api_key"].strip()
+        if key:
+            search = SearchConfig(
+                api_key=key,
+                base_url=cfg.get("search", "base_url", fallback="https://qianfan.baidubce.com/v2/ai_search"),
+            )
     return Settings(
         llm=llm,
         workspace_root=str(Path(workspace_root).resolve()),
         system_prompt=cfg.get("agent", "system_prompt", fallback=""),
+        search=search,
     )

@@ -1,0 +1,10 @@
+{
+  "version": "2.0.18",
+  "created": "2026-10-27T12:04:29.947627",
+  "app_id": "56C4F782-56B5-5891-8094-EC2332CB83B8",
+  "config_hash": "03ee8b31c1df4b57118dc183afba486f80ec4a7e8bde5b7f9fa29c7d9afcdff8",
+  "platform_hashes": {
+    "windows": "c0041d6127e98b4e043ad44cee9feed3212714e270598c3808f9df3aba23d525"
+  },
+  "last_updated": "2026-10-27T12:04:29.980246"
+}

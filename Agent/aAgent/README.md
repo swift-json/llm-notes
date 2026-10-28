@@ -12,6 +12,8 @@
 |------|------|------|
 | 日期时间 | `getDate` | 调用系统命令获取当前日期和时间 |
 | 日期时间 | `isLeapYear` | 判断指定年份是否为闰年 |
+| 网络搜索 | `searchWeb` | 通过百度千帆联网搜索，获取互联网上的最新信息（实时事件、新闻、价格、官网文档等） |
+| 网页抓取 | `fetchWeb` | 用 curl 获取指定网页源码，trafilatura 提取正文并转为 Markdown（保留标题、段落、列表、表格、链接） |
 | 文件 | `getCwd` | 获取工作区根目录 |
 | 文件 | `listDir` | 列出目录下的文件和子目录 |
 | 文件 | `getFileType` | 获取文件的扩展名类型 |
@@ -40,7 +42,9 @@ aAgent/
 │   └── tools/
 │       ├── registry.py      #   Tool 抽象与注册表
 │       ├── datetime_tools.py
-│       └── file_tools.py
+│       ├── file_tools.py
+│       ├── fetch_tools.py
+│       └── web_tools.py
 └── ui/
     └── tui/app.py           # Textual 终端界面
 ```
@@ -50,12 +54,13 @@ aAgent/
 ## 环境要求
 
 - Python 3.9 及以上
-- 依赖：`openai`、`textual`
+- 系统依赖：`curl`（已预装在 Windows 10+）
+- Python 依赖：`openai`、`textual`、`trafilatura`
 
 安装依赖：
 
 ```bash
-pip install openai textual
+pip install openai textual trafilatura
 ```
 
 ---
@@ -73,15 +78,21 @@ model = deepseek-flash
 [agent]
 workspace_root = D:\LLM-Course
 system_prompt = 你是一个可以查询日期时间、操作本地文件的智能助手。
+
+[search]
+baidu_qianfan_api_key = bce-v3/你的百度千帆密钥
+; base_url = https://qianfan.baidubce.com/v2/ai_search   ; 可选，默认百度千帆
 ```
 
 | 配置项 | 说明 |
 |--------|------|
-| `base_url` | OpenAI 兼容接口地址 |
-| `api_key` | 接口密钥 |
+| `base_url`（[llm]） | OpenAI 兼容接口地址 |
+| `api_key`（[llm]） | LLM 接口密钥 |
 | `model` | 模型名称 |
 | `workspace_root` | 文件工具允许访问的根目录；不填则默认为配置文件上两级目录 |
 | `system_prompt` | 系统提示词，可省略 |
+| `baidu_qianfan_api_key`（[search]） | 百度千帆 AI 搜索 API Key；不配则 searchWeb 工具不注册 |
+| `base_url`（[search]） | 搜索 API 地址，可省略 |
 
 > `config.ini` 中含真实密钥，请勿提交到公开仓库或分享给他人。
 
@@ -112,6 +123,9 @@ D:\Python\Python39\python.exe D:\LLM-Course\Agent\aAgent\main.py
 - `列出 Playground 目录下的文件`
 - `在 Playground 下创建 demo 目录，写一个 hello.txt，内容是 Hello`
 - `把 hello.txt 重命名为 hi.txt，再读出来看看`
+- `2026 年国庆假期放几天？`
+- `帮我搜一下 Python 3.13 有哪些新特性`
+- `打开 https://docs.python.org/3/whatsnew/3.13.html 帮我总结一下`
 
 界面会依次显示：用户消息卡片 → 工具调用卡片（参数、结果、耗时）→ AI 最终回复。
 
