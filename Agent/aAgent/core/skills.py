@@ -7,6 +7,7 @@
 """
 import os
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Union
@@ -182,3 +183,57 @@ class SkillManager:
         if not content.strip():
             return f"(文件为空: {path.name})"
         return content
+
+    # ---------- 创建 ----------
+
+    @staticmethod
+    def sanitize_dirname(name: str) -> str:
+        """将 Skill 名称转换为合法目录名：小写字母/数字/连字符优先，
+        若无法 ASCII 化（如纯中文）则保留 Unicode 名称并去掉路径非法字符。
+        """
+        # 尝试 ASCII 化
+        normalized = unicodedata.normalize("NFKD", name)
+        ascii_name = normalized.encode("ascii", "ignore").decode("ascii")
+        ascii_name = re.sub(r"[^a-z0-9]+", "-", ascii_name.lower())
+        ascii_name = re.sub(r"-+", "-", ascii_name).strip("-")
+        if ascii_name:
+            return ascii_name
+
+        # 兜底：保留原 Unicode 名称，去掉 Windows 路径非法字符和空白
+        fallback = re.sub(r'[\\/:*?"<>|\s]+', "-", name.strip())
+        fallback = re.sub(r"-+", "-", fallback).strip("-")
+        return fallback
+
+    def create_skill(self, name: str, skill_context: str) -> str:
+        """创建新 Skill 的目录和 SKILL.md。
+
+        目录名通过 sanitize_dirname 规范为小写字母/数字/连字符格式。
+        SKILL.md 需已包含正确的 YAML Frontmatter（name / description），
+        由调用方（LLM）负责生成；此方法只负责落盘。
+        """
+        dirname = self.sanitize_dirname(name)
+        if not dirname:
+            return f"错误: Skill 名称 `{name}` 无法转换为合法目录名"
+
+        skill_dir = self.skills_dir / dirname
+        skill_md = skill_dir / "SKILL.md"
+
+        if skill_md.exists():
+            return (
+                f"错误: Skill `{dirname}` 已存在（目录: {skill_dir}）。"
+                f"如需覆盖，请先手动删除该目录。"
+            )
+
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            with open(skill_md, "w", encoding="utf-8") as f:
+                f.write(skill_context.rstrip() + "\n")
+        except OSError as exc:
+            return f"错误: 无法写入 {skill_md}: {exc}"
+
+        # 重新发现，使新 Skill 能立即被后续 loadSkill 调用
+        self.discover()
+        return (
+            f"已创建 Skill `{dirname}`（目录: {skill_dir}）。"
+            f"可通过 `loadSkill` 加载完整指令，或继续用文件工具添加 references/、scripts/ 等目录。"
+        )
